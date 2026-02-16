@@ -10,10 +10,6 @@ on:
         options:
           - all
           - 01-networking
-          - 02-security
-          - 03-compute
-          - 04-storage
-          - 05-application
 
 permissions:
   id-token: write
