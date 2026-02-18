@@ -84,7 +84,7 @@ resource "aws_security_group" "app_server" {
   }
 
   egress {
-    description      = "Allow all outbound IPv6"
+    description      = "Allow all outbound IPv6 (via Egress-Only IGW)"
     from_port        = 0
     to_port          = 0
     protocol         = "-1"
@@ -124,7 +124,7 @@ resource "aws_lb_target_group" "app" {
   port            = 80
   protocol        = "HTTP"
   vpc_id          = data.terraform_remote_state.networking.outputs.vpc_id
-  ip_address_type = "ipv6"
+  ip_address_type = "ipv4"
 
   health_check {
     enabled             = true
@@ -166,13 +166,12 @@ resource "aws_lb_listener" "http" {
 # Launch Template
 resource "aws_launch_template" "app" {
   name_prefix   = "${var.project_prefix}-app-"
-  image_id      = var.ami_id # Verwende Ubuntu AMI (z.B. ami-0084a47cc718c111a für Ubuntu 22.04 in eu-central-1)
+  image_id      = var.ami_id
   instance_type = var.instance_type
 
   network_interfaces {
     associate_public_ip_address = false
     security_groups             = [aws_security_group.app_server.id]
-    ipv6_address_count          = 1
   }
 
   iam_instance_profile {
@@ -181,6 +180,9 @@ resource "aws_launch_template" "app" {
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
+    # Verwende IPv6 für apt-get
+    echo 'Acquire::ForceIPv6 "true";' > /etc/apt/apt.conf.d/99force-ipv6
+
     apt-get update
     apt-get install -y nginx
     systemctl start nginx
@@ -221,7 +223,7 @@ resource "aws_autoscaling_group" "app" {
   vpc_zone_identifier       = data.terraform_remote_state.networking.outputs.private_subnet_ids
   target_group_arns         = [aws_lb_target_group.app.arn]
   health_check_type         = "ELB"
-  health_check_grace_period = 300
+  health_check_grace_period = 600
 
   min_size         = 2
   max_size         = var.asg_max_size
