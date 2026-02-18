@@ -19,6 +19,9 @@ terraform.tfvars
 # Pycharm
 .idea/
 
+# Local files
+local_files/
+
 # ===================================
 # Terraform
 # ===================================
