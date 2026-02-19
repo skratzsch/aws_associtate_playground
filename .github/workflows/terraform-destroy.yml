@@ -27,7 +27,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.module }}" == "all" ]; then
             # Reverse order for destroy (last created, first destroyed)
-            echo 'modules=["01-networking"]' >> $GITHUB_OUTPUT
+            echo 'modules=["03-storage","02-compute","01-networking"]' >> $GITHUB_OUTPUT
           else
             echo 'modules=["${{ github.event.inputs.module }}"]' >> $GITHUB_OUTPUT
           fi

@@ -23,6 +23,11 @@ output "app_server_sg_id" {
   value       = aws_security_group.app_server.id
 }
 
+output "app_server_security_group_id" {
+  description = "Security Group ID for App Servers (alias)"
+  value       = aws_security_group.app_server.id
+}
+
 output "alb_sg_id" {
   description = "Security Group ID for ALB"
   value       = aws_security_group.alb.id
