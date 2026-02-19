@@ -99,40 +99,6 @@ resource "aws_backup_vault" "efs_vault" {
   }
 }
 
-# IAM Role für AWS Backup
-resource "aws_iam_role" "backup" {
-  name = "${var.project_prefix}-efs-backup-role-${var.environment}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "backup.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "${var.project_prefix}-efs-backup-role"
-    Environment = var.environment
-    Project     = var.project_prefix
-  }
-}
-
-# Attach AWS Managed Policy für Backup
-resource "aws_iam_role_policy_attachment" "backup_policy" {
-  role       = aws_iam_role.backup.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
-}
-
-resource "aws_iam_role_policy_attachment" "restore_policy" {
-  role       = aws_iam_role.backup.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores"
-}
 
 # AWS Backup Plan
 resource "aws_backup_plan" "efs_backup" {
@@ -165,7 +131,7 @@ resource "aws_backup_plan" "efs_backup" {
 resource "aws_backup_selection" "efs_backup_selection" {
   name         = "${var.project_prefix}-efs-backup-selection"
   plan_id      = aws_backup_plan.efs_backup.id
-  iam_role_arn = aws_iam_role.backup.arn
+  iam_role_arn = var.backup_service_role_arn
 
   resources = [
     aws_efs_file_system.main.arn
