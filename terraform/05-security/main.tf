@@ -1,0 +1,146 @@
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+
+# KMS Key für Secrets Encryption
+resource "aws_kms_key" "secrets" {
+  description             = "KMS key for encrypting secrets"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  tags = {
+    Name        = "${var.project_prefix}-secrets-kms"
+    Environment = var.environment
+    Project     = var.project_prefix
+  }
+}
+
+resource "aws_kms_alias" "secrets" {
+  name          = "alias/${var.project_prefix}-secrets"
+  target_key_id = aws_kms_key.secrets.key_id
+}
+
+# Secrets Manager - GitHub Token (Placeholder)
+resource "aws_secretsmanager_secret" "github_token" {
+  name       = "${var.project_prefix}-github-token"
+  kms_key_id = aws_kms_key.secrets.arn
+
+  tags = {
+    Name        = "${var.project_prefix}-github-token"
+    Environment = var.environment
+    Project     = var.project_prefix
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "github_token" {
+  secret_id     = aws_secretsmanager_secret.github_token.id
+  secret_string = jsonencode({
+    token = "PLACEHOLDER_SET_MANUALLY"
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# IAM Role für EC2 Instances
+resource "aws_iam_role" "ec2_instance" {
+  name = "${var.project_prefix}-ec2-instance-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_prefix}-ec2-instance-role"
+    Environment = var.environment
+    Project     = var.project_prefix
+  }
+}
+
+# IAM Policy für SSM Session Manager
+resource "aws_iam_role_policy_attachment" "ssm_managed_instance" {
+  role       = aws_iam_role.ec2_instance.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# IAM Policy für CloudWatch Logs
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.ec2_instance.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# Custom Policy für Secrets Manager Read
+resource "aws_iam_policy" "secrets_read" {
+  name        = "${var.project_prefix}-secrets-read"
+  description = "Allow reading secrets from Secrets Manager"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.github_token.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey"
+        ]
+        Resource = [
+          aws_kms_key.secrets.arn
+        ]
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_prefix}-secrets-read"
+    Environment = var.environment
+    Project     = var.project_prefix
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "secrets_read" {
+  role       = aws_iam_role.ec2_instance.name
+  policy_arn = aws_iam_policy.secrets_read.arn
+}
+
+# IAM Instance Profile
+resource "aws_iam_instance_profile" "ec2_instance" {
+  name = "${var.project_prefix}-ec2-instance-profile"
+  role = aws_iam_role.ec2_instance.name
+
+  tags = {
+    Name        = "${var.project_prefix}-ec2-instance-profile"
+    Environment = var.environment
+    Project     = var.project_prefix
+  }
+}
+

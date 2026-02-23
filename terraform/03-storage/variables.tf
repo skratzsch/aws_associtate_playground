@@ -7,7 +7,7 @@ variable "region" {
 variable "project_prefix" {
   description = "Project prefix for resource naming"
   type        = string
-  default     = "capstone"
+  default     = "tuwa"
 }
 
 variable "environment" {
