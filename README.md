@@ -19,7 +19,7 @@ Five Terraform modules deployed in dependency order:
 - No NAT Gateway — private subnets use Egress-Only IGW for IPv6 outbound. Ubuntu apt works natively over IPv6.
 - EC2 instances use SSM Session Manager instead of SSH (no port 22).
 - IMDSv2 enforced on all instances.
-- DB credentials stored in SSM Parameter Store, not in code.
+- DB credentials stored in Github Actions Secrets and injected via SSM Parameter Store.
 
 ## CI/CD
 

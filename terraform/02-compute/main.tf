@@ -13,6 +13,15 @@ provider "aws" {
 }
 
 # Data Sources - Networking Outputs
+data "terraform_remote_state" "security" {
+  backend = "s3"
+  config = {
+    bucket = "aws-associate-playground-terraform-state"
+    key    = "dev/security/terraform.tfstate"
+    region = "eu-central-1"
+  }
+}
+
 data "terraform_remote_state" "networking" {
   backend = "s3"
   config = {
@@ -175,7 +184,7 @@ resource "aws_launch_template" "app" {
   }
 
   iam_instance_profile {
-    name = var.instance_profile_name
+    name = data.terraform_remote_state.security.outputs.ec2_instance_profile_name
   }
 
   user_data = base64encode(<<-EOF

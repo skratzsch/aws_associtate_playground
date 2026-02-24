@@ -28,11 +28,6 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "instance_profile_name" {
-  description = "IAM instance profile name"
-  type        = string
-  default     = ""
-}
 
 variable "asg_max_size" {
   description = "Maximum size of Auto Scaling Group"
