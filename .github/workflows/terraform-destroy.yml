@@ -10,6 +10,10 @@ on:
         options:
           - all
           - 01-networking
+          - 02-compute
+          - 03-storage
+          - 04-database
+          - 05-security
 
 permissions:
   id-token: write
@@ -27,7 +31,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.module }}" == "all" ]; then
             # Reverse order for destroy (last created, first destroyed)
-            echo 'modules=["03-storage","02-compute","01-networking"]' >> $GITHUB_OUTPUT
+            echo 'modules=["05-security","04-database","03-storage","02-compute","01-networking"]' >> $GITHUB_OUTPUT
           else
             echo 'modules=["${{ github.event.inputs.module }}"]' >> $GITHUB_OUTPUT
           fi
@@ -60,5 +64,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Destroy
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform destroy -auto-approve
         continue-on-error: false  # Stop bei Fehler

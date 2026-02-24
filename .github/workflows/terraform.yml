@@ -81,6 +81,8 @@ jobs:
 
       - name: Terraform Plan
         id: plan
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform plan -no-color
         continue-on-error: true
 
@@ -120,4 +122,6 @@ jobs:
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform apply -auto-approve
