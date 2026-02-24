@@ -16,3 +16,9 @@ variable "project_prefix" {
   default     = "tuwa"
 }
 
+variable "backup_service_role_arn" {
+  description = "ARN of the AWS Backup service role that GitHub Actions needs to pass"
+  type        = string
+  default     = "arn:aws:iam::891376982602:role/service-role/AWSBackupDefaultServiceRole"
+}
+

@@ -132,6 +132,28 @@ resource "aws_iam_role_policy_attachment" "secrets_read" {
   policy_arn = aws_iam_policy.secrets_read.arn
 }
 
+# Data Source - GitHub Actions Role
+data "aws_iam_role" "github_actions" {
+  name = "github-actions-terraform"
+}
+
+# Policy: GitHub Actions darf AWSBackupDefaultServiceRole passieren
+resource "aws_iam_role_policy" "github_actions_backup_passrole" {
+  name = "backup-passrole"
+  role = data.aws_iam_role.github_actions.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = var.backup_service_role_arn
+      }
+    ]
+  })
+}
+
 # IAM Instance Profile
 resource "aws_iam_instance_profile" "ec2_instance" {
   name = "${var.project_prefix}-ec2-instance-profile"
