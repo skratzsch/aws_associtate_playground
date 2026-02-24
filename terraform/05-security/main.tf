@@ -89,10 +89,10 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
-# Custom Policy für Secrets Manager Read
+# Custom Policy für Secrets Manager + SSM Parameter Store Read
 resource "aws_iam_policy" "secrets_read" {
   name        = "${var.project_prefix}-secrets-read"
-  description = "Allow reading secrets from Secrets Manager"
+  description = "Allow reading secrets from Secrets Manager and SSM Parameter Store"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -116,6 +116,15 @@ resource "aws_iam_policy" "secrets_read" {
         Resource = [
           aws_kms_key.secrets.arn
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "arn:aws:ssm:${var.region}:*:parameter/${var.project_prefix}/${var.environment}/db/*"
       }
     ]
   })
