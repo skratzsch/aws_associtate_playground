@@ -10,10 +10,10 @@ on:
         options:
           - all
           - 01-networking
-          - 02-compute
-          - 03-storage
-          - 04-database
-          - 05-security
+          - 02-security
+          - 03-compute
+          - 04-storage
+          - 05-database
 
 permissions:
   id-token: write
@@ -30,8 +30,8 @@ jobs:
         id: set-modules
         run: |
           if [ "${{ github.event.inputs.module }}" == "all" ]; then
-            # Reverse order for destroy (last created, first destroyed)
-            echo 'modules=["05-security","04-database","03-storage","02-compute","01-networking"]' >> $GITHUB_OUTPUT
+            # Reverse dependency order for destroy
+            echo 'modules=["05-database","04-storage","03-compute","02-security","01-networking"]' >> $GITHUB_OUTPUT
           else
             echo 'modules=["${{ github.event.inputs.module }}"]' >> $GITHUB_OUTPUT
           fi

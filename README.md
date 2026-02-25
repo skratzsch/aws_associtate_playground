@@ -10,10 +10,10 @@ Five Terraform modules deployed in dependency order:
 | Module | Resources |
 |--------|-----------|
 | `01-networking` | VPC (IPv4 + IPv6), public/private subnets, IGW, Egress-Only IGW |
-| `02-compute` | ALB (dualstack), Auto Scaling Group, Launch Template (nginx) |
-| `03-storage` | EFS (encrypted), AWS Backup |
-| `04-database` | RDS PostgreSQL 15 (Multi-AZ, encrypted), SSM Parameter Store |
-| `05-security` | KMS, Secrets Manager, IAM roles for EC2 |
+| `02-security` | KMS, Secrets Manager, IAM roles for EC2 |
+| `03-compute` | ALB (dualstack), Auto Scaling Group, Launch Template (nginx) |
+| `04-storage` | EFS (encrypted), AWS Backup |
+| `05-database` | RDS PostgreSQL 15 (Multi-AZ, encrypted), SSM Parameter Store |
 
 **Design decisions:**
 - No NAT Gateway — private subnets use Egress-Only IGW for IPv6 outbound. Ubuntu apt works natively over IPv6.
@@ -59,7 +59,7 @@ Keys:   dev/networking/terraform.tfstate
 ### Run a plan locally
 
 ```bash
-cd terraform/04-database
+cd terraform/05-database
 terraform init
 terraform plan -var="db_password=<your-password>"
 ```

@@ -26,11 +26,11 @@ jobs:
       - name: Detect changed modules
         id: set-modules
         run: |
-          # Get all terraform module directories
-          ALL_MODULES=$(find terraform -maxdepth 1 -type d -name '[0-9]*-*' | sort)
-          
+          # Dependency-based apply order: networking → security → compute → storage → database
+          APPLY_ORDER="terraform/01-networking terraform/02-security terraform/03-compute terraform/04-storage terraform/05-database"
+
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            # Bei PR: Nur geänderte Module
+            # Bei PR: Nur geänderte Module (in dependency order)
             CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
             CHANGED_MODULES=$(echo "$CHANGED_FILES" | grep '^terraform/' | cut -d'/' -f1-2 | sort -u)
             if [ -z "$CHANGED_MODULES" ]; then
@@ -40,8 +40,8 @@ jobs:
               echo "modules=$MODULES" >> $GITHUB_OUTPUT
             fi
           else
-            # Bei Push auf main: Alle Module in Reihenfolge
-            MODULES=$(echo "$ALL_MODULES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            # Bei Push auf main: Alle Module in Dependency-Reihenfolge
+            MODULES=$(echo "$APPLY_ORDER" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
             echo "modules=$MODULES" >> $GITHUB_OUTPUT
           fi
 

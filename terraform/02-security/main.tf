@@ -32,8 +32,9 @@ resource "aws_kms_alias" "secrets" {
 
 # Secrets Manager - GitHub Token (Placeholder)
 resource "aws_secretsmanager_secret" "github_token" {
-  name       = "${var.project_prefix}-github-token"
-  kms_key_id = aws_kms_key.secrets.arn
+  name                    = "${var.project_prefix}-github-token"
+  kms_key_id              = aws_kms_key.secrets.arn
+  recovery_window_in_days = 0
 
   tags = {
     Name        = "${var.project_prefix}-github-token"

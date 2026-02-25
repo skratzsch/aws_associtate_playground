@@ -1,4 +1,4 @@
-# 05-security
+# 02-security
 
 Security & IAM Module für AWS Associate Playground.
 
@@ -30,7 +30,7 @@ aws secretsmanager put-secret-value \
 
 ## Outputs
 
-- `ec2_instance_profile_name`: Für 02-compute Launch Template
+- `ec2_instance_profile_name`: Für 03-compute Launch Template
 - `github_token_secret_arn`: Für Ansible/Deployment Scripts
 - `kms_key_arn`: Für zusätzliche Secrets
 
