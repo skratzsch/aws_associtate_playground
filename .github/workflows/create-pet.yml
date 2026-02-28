@@ -72,3 +72,47 @@ jobs:
       - run: terraform init
       - run: terraform validate
       - run: terraform apply -auto-approve
+
+  ansible:
+    needs: compute-pet
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - name: Install Ansible and dependencies
+        run: |
+          pip install ansible boto3 botocore
+          ansible-galaxy collection install community.aws amazon.aws
+          curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+            -o /tmp/ssm-plugin.deb
+          sudo dpkg -i /tmp/ssm-plugin.deb
+
+      - name: Wait for SSM agent
+        run: |
+          echo "Waiting for SSM agent to come online..."
+          for i in $(seq 1 20); do
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=tag:deployment_type,Values=pet" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text 2>/dev/null)
+            if [ "$STATUS" = "Online" ]; then
+              echo "SSM agent is online."
+              exit 0
+            fi
+            echo "Attempt $i/20: not ready (${STATUS}), waiting 15s..."
+            sleep 15
+          done
+          echo "Timeout: SSM agent did not come online."
+          exit 1
+
+      - name: Run Ansible playbook
+        run: ansible-playbook playbooks/site.yml
