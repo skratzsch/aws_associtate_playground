@@ -25,6 +25,14 @@
       args:
         creates: /usr/bin/node
 
+    - name: Create app directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
     - name: Clone NextJS repository
       ansible.builtin.git:
         repo: "{{ nextjs_repo_url }}"

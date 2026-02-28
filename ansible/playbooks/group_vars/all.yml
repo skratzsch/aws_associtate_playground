@@ -1,4 +1,5 @@
-ansible_connection: community.aws.aws_ssm
+ansible_connection: amazon.aws.aws_ssm
 ansible_aws_ssm_region: eu-central-1
+ansible_aws_ssm_s3_addressing_style: path
 
 nextjs_repo_url: https://github.com/skratzsch/on-the-run-web.git
