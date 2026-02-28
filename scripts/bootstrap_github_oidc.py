@@ -7,6 +7,7 @@ Creates:
   - IAM Role:      github-actions-terraform
   - Policies:      PowerUserAccess, IAMFullAccess (managed)
                    backup-passrole (inline, allows iam:PassRole on AWSBackupDefaultServiceRole)
+                   ansible-ssm     (inline, allows SSM StartSession for Ansible)
 
 Cannot be managed by Terraform itself (chicken-and-egg: needs the role to run).
 Run once before the first GitHub Actions workflow execution.
@@ -152,6 +153,32 @@ def put_backup_passrole_policy(iam, account_id):
     print(f"  Inline policy set (resource: {backup_role_arn})\n")
 
 
+def put_ansible_ssm_policy(iam):
+    policy_name = "ansible-ssm"
+    print(f"Putting inline policy: {policy_name}")
+    iam.put_role_policy(
+        RoleName=ROLE_NAME,
+        PolicyName=policy_name,
+        PolicyDocument=json.dumps({
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "ssm:StartSession",
+                        "ssm:TerminateSession",
+                        "ssm:ResumeSession",
+                        "ssm:DescribeInstanceInformation",
+                        "ssm:GetConnectionStatus"
+                    ],
+                    "Resource": "*"
+                }
+            ]
+        })
+    )
+    print(f"  Inline policy set\n")
+
+
 def main():
     session = boto3.Session(region_name=REGION)
     sts = session.client("sts")
@@ -165,6 +192,7 @@ def main():
         ensure_role(iam, provider_arn)
         attach_managed_policies(iam)
         put_backup_passrole_policy(iam, account_id)
+        put_ansible_ssm_policy(iam)
 
     except ClientError as e:
         print(f"\nAWS error: {e}", file=sys.stderr)
