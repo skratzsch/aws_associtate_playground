@@ -54,23 +54,25 @@ Packer builds a custom AMI with the full stack baked in. Auto Scaling Group uses
 
 ## Ansible
 
-Located in `ansible/`. Connects to EC2 via SSM Session Manager using the `community.aws.aws_ssm` connection plugin — no IP addresses, no open ports.
+Located in `ansible/`. Connects to EC2 via SSM Session Manager using the `amazon.aws.aws_ssm` connection plugin — no IP addresses, no open ports.
 
 Dynamic inventory via `amazon.aws.aws_ec2` plugin filters by tag `deployment_type: pet`.
 
 ```
 ansible/
 ├── ansible.cfg
-├── inventory/aws_ec2.yml       # dynamic inventory (tag: deployment_type=pet)
-├── group_vars/all.yml          # SSM connection config + repo URL
+├── inventory/aws_ec2.yml            # dynamic inventory (tag: deployment_type=pet)
 └── playbooks/
-    ├── site.yml                # entry point
-    ├── nginx.yml               # installs and configures NGINX
-    ├── nextjs.yml              # clones repo, builds and runs NextJS
+    ├── site.yml                     # entry point
+    ├── nginx.yml                    # installs and configures NGINX
+    ├── nextjs.yml                   # clones repo, builds and runs NextJS
+    ├── group_vars/all.yml           # SSM connection config + repo URL
     └── templates/
-        ├── nginx.conf.j2       # reverse proxy: port 80 → 3000
-        └── nextjs.service.j2   # systemd service definition
+        ├── nginx.conf.j2            # reverse proxy: port 80 → 3000
+        └── nextjs.service.j2        # systemd service definition
 ```
+
+See [`ansible/README.md`](ansible/README.md) for setup details and a full debugging log of known SSM issues.
 
 ## Remote State
 
