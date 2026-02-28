@@ -54,6 +54,8 @@ jobs:
   compute-pet:
     needs: security
     runs-on: ubuntu-latest
+    outputs:
+      ansible_bucket_name: ${{ steps.tf_output.outputs.ansible_bucket_name }}
     defaults:
       run:
         working-directory: ./terraform/03-compute-pet
@@ -72,6 +74,10 @@ jobs:
       - run: terraform init
       - run: terraform validate
       - run: terraform apply -auto-approve
+
+      - name: Get Ansible bucket name
+        id: tf_output
+        run: echo "ansible_bucket_name=$(terraform output -raw ansible_bucket_name)" >> $GITHUB_OUTPUT
 
   ansible:
     needs: compute-pet
@@ -115,4 +121,4 @@ jobs:
           exit 1
 
       - name: Run Ansible playbook
-        run: ansible-playbook playbooks/site.yml
+        run: ansible-playbook playbooks/site.yml -e "ansible_aws_ssm_bucket_name=${{ needs.compute-pet.outputs.ansible_bucket_name }}"

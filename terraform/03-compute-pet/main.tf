@@ -12,6 +12,8 @@ provider "aws" {
   region = var.region
 }
 
+data "aws_caller_identity" "current" {}
+
 data "terraform_remote_state" "security" {
   backend = "s3"
   config = {
@@ -28,6 +30,69 @@ data "terraform_remote_state" "networking" {
     key    = "dev/networking/terraform.tfstate"
     region = "eu-central-1"
   }
+}
+
+# S3 Bucket für Ansible SSM Connection Plugin (temporäre Dateien)
+resource "aws_s3_bucket" "ansible_tmp" {
+  bucket        = "${var.project_prefix}-ansible-tmp-${var.environment}-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+
+  tags = {
+    Name        = "${var.project_prefix}-ansible-tmp"
+    Environment = var.environment
+    Project     = var.project_prefix
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "ansible_tmp" {
+  bucket                  = aws_s3_bucket.ansible_tmp.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "ansible_tmp" {
+  bucket = aws_s3_bucket.ansible_tmp.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "ansible_tmp" {
+  bucket = aws_s3_bucket.ansible_tmp.id
+  rule {
+    id     = "delete-old-tmp-files"
+    status = "Enabled"
+    expiration {
+      days = 1
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "ansible_tmp" {
+  bucket = aws_s3_bucket.ansible_tmp.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { AWS = data.terraform_remote_state.security.outputs.ec2_instance_role_arn }
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.ansible_tmp.arn,
+          "${aws_s3_bucket.ansible_tmp.arn}/*"
+        ]
+      }
+    ]
+  })
 }
 
 resource "aws_security_group" "pet" {
