@@ -8,6 +8,11 @@
     app_user: ubuntu
 
   tasks:
+    - name: Install acl (required for become_user)
+      ansible.builtin.apt:
+        name: acl
+        state: present
+
     - name: Install git
       ansible.builtin.apt:
         name: git
