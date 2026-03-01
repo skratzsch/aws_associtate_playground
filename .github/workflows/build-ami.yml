@@ -57,10 +57,15 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         id: subnet
         run: |
-          SUBNET_ID=$(aws s3 cp \
-            s3://aws-associate-playground-terraform-state/dev/networking/terraform.tfstate - \
-            | jq -r '.outputs.public_subnet_ids.value[0]')
+          SUBNET_ID=$(aws ec2 describe-subnets \
+            --filters \
+              "Name=tag:Project,Values=tuwa" \
+              "Name=tag:Type,Values=public" \
+              "Name=tag:Environment,Values=dev" \
+            --query 'Subnets[0].SubnetId' \
+            --output text)
           echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
+          echo "Using subnet: $SUBNET_ID"
 
       - name: Install Session Manager Plugin
         if: steps.check.outputs.skip != 'true'
