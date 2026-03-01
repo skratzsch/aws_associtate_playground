@@ -214,3 +214,25 @@ In the original `create-cattle.yml`, `build-ami` and `networking` ran in paralle
 **Fix:**
 `build-ami.yml` is now self-contained and runs `networking` → `security` → `build`
 sequentially within the same workflow. Job ordering is guaranteed.
+
+---
+
+### 7. Script not running as root — permission errors during apt-get / systemd
+
+**Cause:**
+With the SSM communicator, Packer connects as `ubuntu` (the `ssh_username`). The
+provisioner shell script runs as that user by default — no root access, `apt-get` and
+`systemctl` fail.
+
+**Fix in `cattle.pkr.hcl`:**
+```hcl
+provisioner "shell" {
+  script          = "scripts/setup.sh"
+  execute_command = "sudo bash '{{.Path}}'"
+}
+```
+The `execute_command` override runs the script as root via sudo. The `sudo -u ubuntu`
+block inside `setup.sh` for git clone + npm build is intentional and stays — the app
+should be owned by the `ubuntu` user, not root.
+
+---
