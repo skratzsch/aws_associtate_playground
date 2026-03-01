@@ -13,7 +13,51 @@ permissions:
   contents: read
 
 jobs:
+  networking:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform/01-networking
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform apply -auto-approve
+
+  security:
+    needs: networking
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform/02-security
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform apply -auto-approve
+
   build:
+    needs: security
     runs-on: ubuntu-latest
     outputs:
       ami_id: ${{ steps.resolve.outputs.ami_id }}
@@ -62,7 +106,6 @@ jobs:
             | jq -r '.outputs.ec2_instance_profile_name.value')
           if [ -z "$PROFILE_NAME" ] || [ "$PROFILE_NAME" = "null" ]; then
             echo "ERROR: Could not read instance profile from security state."
-            echo "Make sure 02-security has been applied before running this workflow."
             exit 1
           fi
           echo "profile_name=$PROFILE_NAME" >> $GITHUB_OUTPUT
@@ -79,17 +122,12 @@ jobs:
               "Name=tag:Environment,Values=dev" \
             --query 'Subnets[0].SubnetId' \
             --output text)
-          
-          echo "Using subnet: $SUBNET_ID"
-          
           if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" = "None" ]; then
-            echo "ERROR: No public subnet found with tags Project=tuwa, Type=public, Environment=dev"
-            aws ec2 describe-subnets --filters "Name=tag:Project,Values=tuwa" \
-              --query 'Subnets[*].{ID:SubnetId,Tags:Tags}' --output table
+            echo "ERROR: No public subnet found."
             exit 1
           fi
-          
           echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
+          echo "Using subnet: $SUBNET_ID"
 
       - name: Install Session Manager Plugin
         if: steps.check.outputs.skip != 'true'
