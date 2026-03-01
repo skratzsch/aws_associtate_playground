@@ -53,6 +53,21 @@ jobs:
             echo "No existing AMI for this hash, will build."
           fi
 
+      - name: Get instance profile from security state
+        if: steps.check.outputs.skip != 'true'
+        id: profile
+        run: |
+          PROFILE_NAME=$(aws s3 cp \
+            s3://aws-associate-playground-terraform-state/dev/security/terraform.tfstate - \
+            | jq -r '.outputs.ec2_instance_profile_name.value')
+          if [ -z "$PROFILE_NAME" ] || [ "$PROFILE_NAME" = "null" ]; then
+            echo "ERROR: Could not read instance profile from security state."
+            echo "Make sure 02-security has been applied before running this workflow."
+            exit 1
+          fi
+          echo "profile_name=$PROFILE_NAME" >> $GITHUB_OUTPUT
+          echo "Using instance profile: $PROFILE_NAME"
+
       - name: Get public subnet for Packer build instance
         if: steps.check.outputs.skip != 'true'
         id: subnet
@@ -100,6 +115,7 @@ jobs:
         env:
           PKR_VAR_subnet_id: ${{ steps.subnet.outputs.subnet_id }}
           PKR_VAR_packer_hash: ${{ steps.hash.outputs.hash }}
+          PKR_VAR_instance_profile_name: ${{ steps.profile.outputs.profile_name }}
         run: |
           packer build -machine-readable cattle.pkr.hcl | tee /tmp/packer-output.txt
           PACKER_EXIT=${PIPESTATUS[0]}

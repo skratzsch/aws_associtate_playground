@@ -213,10 +213,16 @@ resource "aws_iam_role_policy" "github_actions_packer" {
         ]
       },
       {
-        # PassRole: allow passing the EC2 instance profile to the Packer build instance
-        Effect   = "Allow"
-        Action   = "iam:PassRole"
-        Resource = aws_iam_role.ec2_instance.arn
+        # PassRole + GetInstanceProfile: pass and validate the EC2 instance profile
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole",
+          "iam:GetInstanceProfile"
+        ]
+        Resource = [
+          aws_iam_role.ec2_instance.arn,
+          aws_iam_instance_profile.ec2_instance.arn
+        ]
       }
     ]
   })
