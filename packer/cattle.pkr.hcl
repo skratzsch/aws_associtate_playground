@@ -23,6 +23,12 @@ variable "subnet_id" {
   description = "Public subnet ID for the Packer build instance"
 }
 
+variable "instance_profile_name" {
+  type        = string
+  default     = "tuwa-ec2-instance-profile"
+  description = "IAM instance profile for the Packer build instance (needs AmazonSSMManagedInstanceCore)"
+}
+
 variable "packer_hash" {
   type        = string
   default     = ""
@@ -37,8 +43,14 @@ source "amazon-ebs" "cattle" {
   region        = var.region
   source_ami    = var.base_ami_id
   instance_type = "t3.small"
-  ssh_username  = "ubuntu"
   subnet_id     = var.subnet_id
+
+  # Use SSM Session Manager instead of direct SSH — no open ports needed,
+  # works regardless of the GitHub Actions runner IP
+  communicator         = "ssh"
+  ssh_interface        = "session_manager"
+  ssh_username         = "ubuntu"
+  iam_instance_profile = var.instance_profile_name
 
   ami_name                    = "tuwa-cattle-${local.timestamp}"
   associate_public_ip_address = true

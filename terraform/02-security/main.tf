@@ -164,7 +164,7 @@ resource "aws_iam_role_policy" "github_actions_backup_passrole" {
   })
 }
 
-# Policy: GitHub Actions darf Packer-AMIs bauen
+# Policy: GitHub Actions darf Packer-AMIs bauen (EC2 + SSM Session Manager communicator)
 resource "aws_iam_role_policy" "github_actions_packer" {
   name = "packer-ami-build"
   role = data.aws_iam_role.github_actions.name
@@ -198,6 +198,25 @@ resource "aws_iam_role_policy" "github_actions_packer" {
           "ec2:DescribeVpcs"
         ]
         Resource = "*"
+      },
+      {
+        # SSM Session Manager communicator: runner tunnels into Packer build instance
+        Effect = "Allow"
+        Action = [
+          "ssm:StartSession",
+          "ssm:TerminateSession",
+          "ssm:GetConnectionStatus"
+        ]
+        Resource = [
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ssm:*::document/AWS-StartSSHSession"
+        ]
+      },
+      {
+        # PassRole: allow passing the EC2 instance profile to the Packer build instance
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = aws_iam_role.ec2_instance.arn
       }
     ]
   })

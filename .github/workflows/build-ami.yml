@@ -62,6 +62,13 @@ jobs:
             | jq -r '.outputs.public_subnet_ids.value[0]')
           echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
 
+      - name: Install Session Manager Plugin
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+            -o /tmp/ssm-plugin.deb
+          sudo dpkg -i /tmp/ssm-plugin.deb
+
       - name: Setup Packer
         if: steps.check.outputs.skip != 'true'
         uses: hashicorp/setup-packer@main
