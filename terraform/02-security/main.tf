@@ -164,6 +164,45 @@ resource "aws_iam_role_policy" "github_actions_backup_passrole" {
   })
 }
 
+# Policy: GitHub Actions darf Packer-AMIs bauen
+resource "aws_iam_role_policy" "github_actions_packer" {
+  name = "packer-ami-build"
+  role = data.aws_iam_role.github_actions.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:RunInstances",
+          "ec2:StopInstances",
+          "ec2:TerminateInstances",
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus",
+          "ec2:CreateImage",
+          "ec2:DeregisterImage",
+          "ec2:DescribeImages",
+          "ec2:DeleteSnapshot",
+          "ec2:DescribeSnapshots",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:DescribeSecurityGroups",
+          "ec2:CreateKeyPair",
+          "ec2:DeleteKeyPair",
+          "ec2:DescribeKeyPairs",
+          "ec2:CreateTags",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeVpcs"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # IAM Instance Profile
 resource "aws_iam_instance_profile" "ec2_instance" {
   name = "${var.project_prefix}-ec2-instance-profile"

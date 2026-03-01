@@ -81,9 +81,15 @@ jobs:
           PKR_VAR_packer_hash: ${{ steps.hash.outputs.hash }}
         run: |
           packer build -machine-readable cattle.pkr.hcl | tee /tmp/packer-output.txt
-          AMI_ID=$(grep 'artifact,0,id' /tmp/packer-output.txt | cut -d, -f6 | cut -d: -f2)
-          echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
-          echo "Built AMI: $AMI_ID"
+          PACKER_EXIT=${PIPESTATUS[0]}
+          if [ $PACKER_EXIT -eq 0 ]; then
+            AMI_ID=$(grep 'artifact,0,id' /tmp/packer-output.txt | cut -d, -f6 | cut -d: -f2)
+            echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+            echo "Built AMI: $AMI_ID"
+          else
+            echo "Packer exited with code $PACKER_EXIT"
+            exit $PACKER_EXIT
+          fi
 
       - name: Resolve AMI ID (with fallback)
         id: resolve
