@@ -17,9 +17,9 @@ variable "project_prefix" {
 }
 
 variable "ami_id" {
-  description = "AMI ID for EC2 instances (Ubuntu with nginx)"
+  description = "AMI ID for EC2 instances — golden AMI built by Packer, overridden by create-cattle pipeline"
   type        = string
-  default     = "ami-0084a47cc718c111a" # Ubuntu 22.04 LTS in eu-central-1
+  default     = "ami-0084a47cc718c111a" # Ubuntu 22.04 LTS eu-central-1 (fallback only)
 }
 
 variable "instance_type" {

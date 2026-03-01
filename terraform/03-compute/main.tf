@@ -189,23 +189,21 @@ resource "aws_launch_template" "app" {
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
-    # Verwende IPv6 für apt-get
-    echo 'Acquire::ForceIPv6 "true";' > /etc/apt/apt.conf.d/99force-ipv6
-
-    apt-get update
-    apt-get install -y nginx
-    systemctl start nginx
-    systemctl enable nginx
-    echo "<h1>Hello from $(hostname -f)</h1>" > /var/www/html/index.html
+    # NGINX and NextJS are pre-installed and enabled in the AMI.
+    # They start automatically on boot via systemd.
+    # Just ensure SSM agent is running for Session Manager access.
+    systemctl enable amazon-ssm-agent
+    systemctl start amazon-ssm-agent
     EOF
   )
 
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name        = "${var.project_prefix}-app-server"
-      Environment = var.environment
-      Project     = var.project_prefix
+      Name            = "${var.project_prefix}-app-server"
+      Environment     = var.environment
+      Project         = var.project_prefix
+      deployment_type = "cattle"
     }
   }
 

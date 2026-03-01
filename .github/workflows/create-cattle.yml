@@ -1,0 +1,81 @@
+name: Create Cattle Infrastructure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-ami:
+    uses: ./.github/workflows/build-ami.yml
+
+  networking:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform/01-networking
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform apply -auto-approve
+
+  security:
+    needs: networking
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform/02-security
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform apply -auto-approve
+
+  compute:
+    needs: [build-ami, security]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform/03-compute
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform apply -auto-approve -var "ami_id=${{ needs.build-ami.outputs.ami_id }}"
+
+      - name: Print ALB DNS
+        run: |
+          echo "ALB DNS: $(terraform output -raw alb_dns_name)"

@@ -1,0 +1,55 @@
+name: Destroy AMI
+
+on:
+  workflow_dispatch:
+    inputs:
+      ami_filter:
+        description: "AMI name filter"
+        required: false
+        default: "tuwa-cattle-*"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - name: Deregister AMIs and delete snapshots
+        run: |
+          AMIS=$(aws ec2 describe-images \
+            --owners self \
+            --filters "Name=name,Values=${{ github.event.inputs.ami_filter }}" \
+            --query 'Images[*].ImageId' \
+            --output text)
+
+          if [ -z "$AMIS" ]; then
+            echo "No AMIs found matching '${{ github.event.inputs.ami_filter }}', nothing to do."
+            exit 0
+          fi
+
+          for AMI_ID in $AMIS; do
+            echo "Processing $AMI_ID..."
+
+            SNAPSHOTS=$(aws ec2 describe-images \
+              --image-ids "$AMI_ID" \
+              --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId' \
+              --output text)
+
+            aws ec2 deregister-image --image-id "$AMI_ID"
+            echo "  Deregistered $AMI_ID"
+
+            for SNAP_ID in $SNAPSHOTS; do
+              aws ec2 delete-snapshot --snapshot-id "$SNAP_ID"
+              echo "  Deleted snapshot $SNAP_ID"
+            done
+          done
+
+          echo "Done."

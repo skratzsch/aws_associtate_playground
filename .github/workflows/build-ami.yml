@@ -1,0 +1,125 @@
+name: Build Cattle AMI
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      ami_id:
+        description: "AMI ID to use for cattle instances"
+        value: ${{ jobs.build.outputs.ami_id }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      ami_id: ${{ steps.resolve.outputs.ami_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::891376982602:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - name: Compute packer hash
+        id: hash
+        run: |
+          HASH=$(find packer/ -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+          echo "hash=${HASH:0:12}" >> $GITHUB_OUTPUT
+          echo "Packer hash: ${HASH:0:12}"
+
+      - name: Check for existing AMI with same hash
+        id: check
+        run: |
+          AMI_ID=$(aws ec2 describe-images \
+            --owners self \
+            --filters \
+              "Name=tag:packer_hash,Values=${{ steps.hash.outputs.hash }}" \
+              "Name=state,Values=available" \
+            --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+            --output text)
+          if [ "$AMI_ID" != "None" ] && [ -n "$AMI_ID" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+            echo "AMI $AMI_ID already exists for hash ${{ steps.hash.outputs.hash }}, skipping build."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "No existing AMI for this hash, will build."
+          fi
+
+      - name: Get public subnet for Packer build instance
+        if: steps.check.outputs.skip != 'true'
+        id: subnet
+        run: |
+          SUBNET_ID=$(aws s3 cp \
+            s3://aws-associate-playground-terraform-state/dev/networking/terraform.tfstate - \
+            | jq -r '.outputs.public_subnet_ids.value[0]')
+          echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
+
+      - name: Setup Packer
+        if: steps.check.outputs.skip != 'true'
+        uses: hashicorp/setup-packer@main
+
+      - name: Packer Init
+        if: steps.check.outputs.skip != 'true'
+        working-directory: ./packer
+        run: packer init .
+
+      - name: Packer Build
+        if: steps.check.outputs.skip != 'true'
+        id: build
+        continue-on-error: true
+        working-directory: ./packer
+        env:
+          PKR_VAR_subnet_id: ${{ steps.subnet.outputs.subnet_id }}
+          PKR_VAR_packer_hash: ${{ steps.hash.outputs.hash }}
+        run: |
+          packer build -machine-readable cattle.pkr.hcl | tee /tmp/packer-output.txt
+          AMI_ID=$(grep 'artifact,0,id' /tmp/packer-output.txt | cut -d, -f6 | cut -d: -f2)
+          echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+          echo "Built AMI: $AMI_ID"
+
+      - name: Resolve AMI ID (with fallback)
+        id: resolve
+        run: |
+          # Priority 1: hash match — build skipped, reuse existing
+          AMI_ID="${{ steps.check.outputs.ami_id }}"
+
+          # Priority 2: fresh packer build succeeded
+          if [ -z "$AMI_ID" ]; then
+            AMI_ID="${{ steps.build.outputs.ami_id }}"
+          fi
+
+          # Priority 3: packer failed — use latest tagged AMI
+          if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+            echo "Packer build failed or no AMI ID — falling back to latest tagged AMI..."
+            AMI_ID=$(aws ec2 describe-images \
+              --owners self \
+              --filters "Name=tag:status,Values=latest" "Name=state,Values=available" \
+              --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+              --output text)
+          fi
+
+          # Priority 4: no latest tag — use any existing tuwa-cattle-* AMI
+          if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+            echo "No latest-tagged AMI — falling back to most recent tuwa-cattle-* AMI..."
+            AMI_ID=$(aws ec2 describe-images \
+              --owners self \
+              --filters "Name=name,Values=tuwa-cattle-*" "Name=state,Values=available" \
+              --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+              --output text)
+          fi
+
+          if [ -z "$AMI_ID" ] || [ "$AMI_ID" = "None" ]; then
+            echo "ERROR: No AMI available and build failed. Cannot continue."
+            exit 1
+          fi
+
+          echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+          echo "Using AMI: $AMI_ID"
