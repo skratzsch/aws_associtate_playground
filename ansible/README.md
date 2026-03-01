@@ -1,39 +1,39 @@
 # Ansible – SSM Showcase
 
-Deploys NGINX + NextJS auf eine einzelne EC2 Instanz (Pet-Style) via AWS SSM Session Manager.
-Kein SSH, kein Bastion, keine offenen Ports. Verbindung läuft komplett über SSM.
+Deploys NGINX + NextJS to a single EC2 instance (pet-style) via AWS SSM Session Manager.
+No SSH, no bastion, no open ports. The connection runs entirely through SSM.
 
-## Verzeichnisstruktur
+## Directory Structure
 
 ```
 ansible/
 ├── ansible.cfg
 ├── inventory/
-│   └── aws_ec2.yml          # Dynamic inventory (filtert nach tag deployment_type=pet)
+│   └── aws_ec2.yml          # Dynamic inventory (filters by tag deployment_type=pet)
 └── playbooks/
-    ├── site.yml              # Einstiegspunkt
-    ├── nginx.yml             # NGINX installieren + Reverse Proxy konfigurieren
-    ├── nextjs.yml            # Node.js + App clonen + bauen + systemd Service
+    ├── site.yml              # Entry point
+    ├── nginx.yml             # Install NGINX + configure reverse proxy
+    ├── nextjs.yml            # Node.js + clone app + build + systemd service
     ├── group_vars/
-    │   └── all.yml           # SSM Connection Config + Repo URL
+    │   └── all.yml           # SSM connection config + repo URL
     └── templates/
-        ├── nginx.conf.j2     # Reverse Proxy: Port 80 → 3000
-        └── nextjs.service.j2 # systemd Service Definition
+        ├── nginx.conf.j2     # Reverse proxy: port 80 → 3000
+        └── nextjs.service.j2 # systemd service definition
 ```
 
-## Voraussetzungen
+## Prerequisites
 
-Auf dem Control Node (GitHub Actions Runner):
+On the control node (GitHub Actions runner):
 - `ansible`, `boto3`, `botocore`
 - Collections: `amazon.aws`, `community.aws`
 - AWS Session Manager Plugin (`session-manager-plugin`)
 
-Auf der EC2:
-- SSM Agent läuft
-- IAM Role mit `AmazonSSMManagedInstanceCore`
-- S3 Zugriff auf den Ansible-Temp-Bucket (via Bucket Policy in `03-compute-pet`)
+On the EC2 instance:
+- SSM Agent running
+- IAM role with `AmazonSSMManagedInstanceCore`
+- S3 access to the Ansible temp bucket (via bucket policy in `03-compute-pet`)
 
-## Ausführen
+## Running
 
 ```bash
 ansible-playbook playbooks/site.yml \
@@ -42,73 +42,73 @@ ansible-playbook playbooks/site.yml \
 
 ---
 
-## Debugging Log – Bekannte Fehler beim Aufbau
+## Debugging Log – Known Errors During Setup
 
-Eine chronologische Dokumentation aller Fehler die beim Aufbau aufgetreten sind.
-Hilfreich als Referenz wenn das Setup neu aufgesetzt wird.
+A chronological record of all errors encountered during the setup.
+Useful as a reference when re-setting up the environment.
 
 ---
 
 ### 1. Deprecated `yaml` Callback Plugin
 
-**Fehler:**
+**Error:**
 ```
 Error: The 'community.general.yaml' callback plugin has been removed.
 ```
 
-**Ursache:**
-`stdout_callback = yaml` in `ansible.cfg` zieht `community.general.yaml`, das in
-community.general 12.0.0 entfernt wurde.
+**Cause:**
+`stdout_callback = yaml` in `ansible.cfg` pulls in `community.general.yaml`, which was
+removed in community.general 12.0.0.
 
 **Fix in `ansible.cfg`:**
 ```ini
-# Vorher
+# Before
 stdout_callback = yaml
 
-# Nachher
+# After
 stdout_callback = default
 result_format   = yaml
 ```
 
 ---
 
-### 2. Ansible verbindet via SSH statt SSM
+### 2. Ansible Connects via SSH Instead of SSM
 
-**Fehler:**
+**Error:**
 ```
 Failed to connect to the host via ssh: ssh: Could not resolve hostname i-0abc123:
 Temporary failure in name resolution
 ```
 
-**Ursache:**
-Ansible sucht `group_vars` relativ zum Playbook oder zur Inventory-Datei — nicht im
-übergeordneten Verzeichnis. `ansible/group_vars/all.yml` wurde ignoriert.
+**Cause:**
+Ansible looks for `group_vars` relative to the playbook or inventory file — not in the
+parent directory. `ansible/group_vars/all.yml` was being ignored.
 
-Ansible sucht:
+Ansible searches:
 - `playbooks/group_vars/` ✓
 - `inventory/group_vars/` ✓
-- `group_vars/` ✗ (wird nicht gefunden)
+- `group_vars/` ✗ (not found)
 
 **Fix:**
-`group_vars/` nach `playbooks/group_vars/` verschieben.
+Move `group_vars/` to `playbooks/group_vars/`.
 
 ---
 
-### 3. SSM Connection: NoneType Fehler bei Gathering Facts
+### 3. SSM Connection: NoneType Error During Gathering Facts
 
-**Fehler:**
+**Error:**
 ```
 Task failed: expected string or bytes-like object, got 'NoneType'
 ```
 
-**Ursache:**
-Das `amazon.aws.aws_ssm` Connection Plugin benötigt zwingend einen S3 Bucket um
-temporäre Dateien (Ansible Module, Templates) zur EC2 zu übertragen. Ohne Bucket
-crasht das Plugin beim ersten File Transfer.
+**Cause:**
+The `amazon.aws.aws_ssm` connection plugin requires an S3 bucket to transfer temporary
+files (Ansible modules, templates) to the EC2 instance. Without a bucket the plugin
+crashes on the first file transfer.
 
 **Fix:**
-S3 Bucket in `03-compute-pet` erstellen. Bucket Name wird via Terraform Output aus
-dem `compute-pet` Job an den `ansible` Job der Pipeline weitergereicht:
+Create an S3 bucket in `03-compute-pet`. The bucket name is passed via Terraform output
+from the `compute-pet` job to the `ansible` job in the pipeline:
 
 ```yaml
 - name: Run Ansible playbook
@@ -118,17 +118,17 @@ dem `compute-pet` Job an den `ansible` Job der Pipeline weitergereicht:
 
 ---
 
-### 4. `become_user` schlägt fehl: setfacl nicht verfügbar
+### 4. `become_user` Fails: setfacl Not Available
 
-**Fehler:**
+**Error:**
 ```
 Failed to set permissions on the temporary files Ansible needs to create
 when becoming an unprivileged user (rc: 1, err: )
 ```
 
-**Ursache:**
-Ansible nutzt `setfacl` wenn es den User wechselt (`become_user`). Das Paket `acl`
-das `setfacl` bereitstellt ist auf Ubuntu nicht standardmäßig installiert.
+**Cause:**
+Ansible uses `setfacl` when switching users (`become_user`). The `acl` package that
+provides `setfacl` is not installed by default on Ubuntu.
 
 **Fix in `nextjs.yml`:**
 ```yaml
@@ -140,19 +140,19 @@ das `setfacl` bereitstellt ist auf Ubuntu nicht standardmäßig installiert.
 
 ---
 
-### 5. Git Clone schlägt fehl: Permission denied in `/opt/`
+### 5. Git Clone Fails: Permission Denied in `/opt/`
 
-**Fehler:**
+**Error:**
 ```
 fatal: could not create work tree dir '/opt/on-the-run-web': Permission denied
 ```
 
-**Ursache:**
-`/opt/` gehört root. Der `ubuntu` User (via `become_user`) kann dort kein
-Verzeichnis anlegen.
+**Cause:**
+`/opt/` is owned by root. The `ubuntu` user (via `become_user`) cannot create
+directories there.
 
 **Fix in `nextjs.yml`:**
-Verzeichnis vorher als root erstellen, dann hat `ubuntu` Schreibzugriff:
+Create the directory first as root so the `ubuntu` user has write access:
 ```yaml
 - name: Create app directory
   ansible.builtin.file:
@@ -167,33 +167,33 @@ Verzeichnis vorher als root erstellen, dann hat `ubuntu` Schreibzugriff:
 
 ### 6. Deprecated Connection Plugin Name
 
-**Hintergrund:**
-`community.aws.aws_ssm` wurde nach `amazon.aws.aws_ssm` migriert und ist deprecated.
+**Background:**
+`community.aws.aws_ssm` was migrated to `amazon.aws.aws_ssm` and is deprecated.
 
 **Fix in `group_vars/all.yml`:**
 ```yaml
-# Vorher
+# Before
 ansible_connection: community.aws.aws_ssm
 
-# Nachher
+# After
 ansible_connection: amazon.aws.aws_ssm
 ```
 
 ---
 
-### 7. Neuer S3 Bucket: HTTP 307 Redirect
+### 7. New S3 Bucket: HTTP 307 Redirect
 
-**Hintergrund:**
-Das SSM Plugin erstellt S3 Presigned URLs. Bei neu erstellten Buckets (< ~1h alt)
-antwortet S3 mit einem HTTP 307 wegen DNS-Propagation. `curl` auf der EC2 folgt
-diesem Redirect nicht, der Download schlägt lautlos fehl.
+**Background:**
+The SSM plugin creates S3 presigned URLs. For newly created buckets (< ~1h old)
+S3 responds with an HTTP 307 due to DNS propagation. `curl` on the EC2 instance does
+not follow this redirect, causing the download to fail silently.
 
-Da der Bucket im selben Pipeline-Run erstellt wird, trifft uns das garantiert.
+Since the bucket is created in the same pipeline run, this will always affect us.
 
 **Fix in `group_vars/all.yml`:**
 ```yaml
 ansible_aws_ssm_s3_addressing_style: path
 ```
 
-Damit wird `s3.amazonaws.com/bucket/key` statt `bucket.s3.amazonaws.com/key`
-verwendet — kein DNS-Problem mehr.
+This uses `s3.amazonaws.com/bucket/key` instead of `bucket.s3.amazonaws.com/key`
+— no DNS issue.
