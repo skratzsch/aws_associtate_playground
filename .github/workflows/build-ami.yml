@@ -64,8 +64,17 @@ jobs:
               "Name=tag:Environment,Values=dev" \
             --query 'Subnets[0].SubnetId' \
             --output text)
-          echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
+          
           echo "Using subnet: $SUBNET_ID"
+          
+          if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" = "None" ]; then
+            echo "ERROR: No public subnet found with tags Project=tuwa, Type=public, Environment=dev"
+            aws ec2 describe-subnets --filters "Name=tag:Project,Values=tuwa" \
+              --query 'Subnets[*].{ID:SubnetId,Tags:Tags}' --output table
+            exit 1
+          fi
+          
+          echo "subnet_id=$SUBNET_ID" >> $GITHUB_OUTPUT
 
       - name: Install Session Manager Plugin
         if: steps.check.outputs.skip != 'true'
