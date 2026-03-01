@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euxo pipefail
 
 # Force IPv6 for apt (consistent with the rest of the project)
 echo 'Acquire::ForceIPv6 "true";' > /etc/apt/apt.conf.d/99force-ipv6
