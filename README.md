@@ -34,11 +34,24 @@ Stack: NGINX → NextJS (port 3000), deployed as a systemd service.
 networking → security → compute-pet → ansible
 ```
 
-### Cattle (coming soon)
+### Cattle (Packer)
 
-Packer builds a custom AMI with the full stack baked in. Auto Scaling Group uses the AMI. No configuration on running instances.
+Packer builds a golden AMI with NGINX + NextJS baked in. Auto Scaling Group uses the AMI — no configuration on running instances, instances are fully ready on first boot.
+
+Hash-based build cache: only rebuilds if `.hcl` or `.sh` files change. Fallback chain if build fails: latest-tagged AMI → most recent `tuwa-cattle-*` AMI.
+
+```
+build-ami (networking → security → packer build) → compute (ASG + ALB)
+```
 
 ## CI/CD
+
+**`build-ami.yml`** — manual trigger (`workflow_dispatch`) or called from `create-cattle`
+- Self-contained: applies `01-networking` → `02-security`, then runs Packer
+- Hash-based skip: skips build if AMI for current `.hcl`/`.sh` hash already exists
+
+**`create-cattle.yml`** — manual trigger (`workflow_dispatch`)
+- Calls `build-ami`, then deploys `03-compute` (ASG + ALB) with the resulting AMI ID
 
 **`create-pet.yml`** — manual trigger (`workflow_dispatch`)
 - Deploys: `01-networking` → `02-security` → `03-compute-pet`
@@ -51,6 +64,9 @@ Packer builds a custom AMI with the full stack baked in. Auto Scaling Group uses
 **`terraform-destroy.yml`** — manual trigger (`workflow_dispatch`)
 - Select a single module or `all`
 - Destroy order: `05 → 04 → 03-compute → 03-compute-pet → 02 → 01`
+
+**`destroy-ami.yml`** — manual trigger (`workflow_dispatch`)
+- Deregisters AMIs and deletes associated snapshots (filter: `tuwa-cattle-*`)
 
 ## Ansible
 
@@ -73,6 +89,19 @@ ansible/
 ```
 
 See [`ansible/README.md`](ansible/README.md) for setup details and a full debugging log of known SSM issues.
+
+## Packer
+
+Located in `packer/`. Builds a golden AMI using the SSM communicator — no port 22, no IP allowlisting.
+
+```
+packer/
+├── cattle.pkr.hcl       # AMI definition (amazon-ebs, SSM communicator)
+└── scripts/
+    └── setup.sh         # installs NGINX, Node.js, builds NextJS, enables systemd services
+```
+
+See [`packer/README.md`](packer/README.md) for setup details and a full debugging log.
 
 ## Remote State
 

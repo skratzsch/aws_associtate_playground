@@ -217,6 +217,25 @@ sequentially within the same workflow. Job ordering is guaranteed.
 
 ---
 
+### 8. AMI rebuilt every run despite existing AMI
+
+**Cause:**
+The hash was computed over all files in `packer/` including `README.md`:
+```bash
+find packer/ -type f | sort | xargs sha256sum | ...
+```
+Any documentation change produces a different hash → existing AMI tag doesn't match →
+cache miss → Packer rebuilds unnecessarily.
+
+**Fix:**
+Only hash files that actually affect the build (`.hcl` and `.sh`):
+```bash
+find packer/ -type f \( -name "*.hcl" -o -name "*.sh" \) | sort | xargs sha256sum | ...
+```
+README changes no longer trigger a rebuild.
+
+---
+
 ### 7. Script not running as root — permission errors during apt-get / systemd
 
 **Cause:**

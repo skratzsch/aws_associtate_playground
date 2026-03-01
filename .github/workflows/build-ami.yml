@@ -74,7 +74,7 @@ jobs:
       - name: Compute packer hash
         id: hash
         run: |
-          HASH=$(find packer/ -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+          HASH=$(find packer/ -type f \( -name "*.hcl" -o -name "*.sh" \) | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH:0:12}" >> $GITHUB_OUTPUT
           echo "Packer hash: ${HASH:0:12}"
 
