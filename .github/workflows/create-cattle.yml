@@ -8,9 +8,6 @@ permissions:
   contents: read
 
 jobs:
-  build-ami:
-    uses: ./.github/workflows/build-ami.yml
-
   networking:
     runs-on: ubuntu-latest
     defaults:
@@ -54,8 +51,13 @@ jobs:
       - run: terraform validate
       - run: terraform apply -auto-approve
 
+  # build-ami runs after security so Packer permissions are guaranteed to be applied
+  build-ami:
+    needs: security
+    uses: ./.github/workflows/build-ami.yml
+
   compute:
-    needs: [build-ami, security]
+    needs: [build-ami]
     runs-on: ubuntu-latest
     defaults:
       run:
